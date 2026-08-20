@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alien Outpost Ascent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #060814; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100%; color: #fff;
+  }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #hud {
+    position: absolute; top: 12px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; user-select: none;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+  }
+  #hudLeft .worldName { font-size: 15px; font-weight: 700; }
+  #hudLeft .sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+  #hudRight { text-align: right; }
+  #livesRow { display: flex; gap: 4px; justify-content: flex-end; }
+  .lifeIcon { width: 16px; height: 16px; border-radius: 50%; background: #ff5a7a; box-shadow: 0 0 4px #ff5a7a; }
+  .lifeIcon.lost { background: rgba(255,255,255,0.15); box-shadow: none; }
+  #altRow { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  #targetRow { font-size: 11px; opacity: 0.7; }
+  #coinRow { font-size: 13px; font-weight: 700; color: #ffd700; text-shadow: 0 0 6px rgba(255,215,0,.6); margin-top: 6px; }
+
+  #buffRow { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; }
+  .buffChip { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+
+  .screen {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(6,8,20,0.92); padding: 20px; box-sizing: border-box; overflow-y: auto;
+  }
+  .screen.show { display: flex; }
+  .screen h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: 0.5px; }
+  .screen p { font-size: 13px; opacity: 0.85; margin: 4px 0; max-width: 460px; line-height: 1.5; }
+  .primaryBtn {
+    margin-top: 16px; padding: 12px 26px; font-size: 15px; font-weight: 700;
+    background: #4bff8f; color: #05170c; border: none; border-radius: 8px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(75,255,143,0.4);
+  }
+  .primaryBtn:disabled { opacity: 0.35; box-shadow: none; cursor: not-allowed; }
+  .primaryBtn:active:not(:disabled) { transform: scale(0.97); }
+  .secondaryBtn {
+    margin-top: 10px; padding: 9px 18px; font-size: 12px; font-weight: 600;
+    background: transparent; color: #cfd6ff; border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 8px; cursor: pointer;
+  }
+  .topRow { display: flex; gap: 10px; width: 100%; max-width: 900px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px; }
+
+  /* ---- Lobby ---- */
+  #lobbyScreen h1 { color: #7dffb0; text-shadow: 0 0 18px rgba(125,255,176,0.5); }
+  #coinBanner { font-size: 13px; font-weight: 700; color: #ffd700; margin-bottom: 4px; }
+  #diffRow { display: flex; gap: 8px; margin: 10px 0 6px; }
+  .diffBtn {
+    padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); color: #fff; cursor: pointer;
+  }
+  .diffBtn.active { border-color: #4bff8f; color: #4bff8f; background: rgba(75,255,143,0.12); box-shadow: 0 0 10px rgba(75,255,143,0.3); }
+  #worldGrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px; width: 100%; max-width: 900px; margin-top: 10px;
+  }
+  .worldCard {
+    position: relative; border-radius: 10px; padding: 10px 10px; cursor: pointer;
+    border: 1.5px solid rgba(255,255,255,0.2); text-align: left; min-height: 92px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    transition: transform 0.1s;
+  }
+  .worldCard:active { transform: scale(0.97); }
+  .worldCard.locked { opacity: 0.4; cursor: not-allowed; }
+  .worldCard.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
+  .worldCard .wName { font-size: 13px; font-weight: 700; }
+  .worldCard .wSub { font-size: 10px; opacity: 0.8; margin-top: 4px; }
+  .worldCard .wTurret { font-size: 9px; margin-top: 6px; opacity: 0.8; font-style: italic; }
+  .worldCard .wProg { font-size: 10px; margin-top: 3px; color: #7dffb0; }
+
+  #levelRow { width: 100%; max-width: 900px; margin-top: 14px; }
+  #levelChips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .levelChip {
+    padding: 10px 16px; border-radius: 10px; cursor: pointer; min-width: 110px;
+    border: 1.5px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.05);
+  }
+  .levelChip.locked { opacity: 0.35; cursor: not-allowed; }
+  .levelChip.selected { border-color: #4bff8f; box-shadow: 0 0 10px rgba(75,255,143,.4); }
+  .levelChip .lName { font-size: 12px; font-weight: 700; }
+  .levelChip .lSub { font-size: 10px; opacity: 0.75; margin-top: 3px; }
+
+  #tutorialCard {
+    width: 100%; max-width: 900px; margin-top: 12px; padding: 10px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.25);
+    display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 12px;
+  }
+
+  /* ---- Shop / Skins ---- */
+  .catalogGrid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; width: 100%; max-width: 820px; margin-top: 14px;
+  }
+  .catalogCard {
+    border-radius: 12px; padding: 14px; border: 1.5px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05); text-align: left;
+  }
+  .catalogCard .cName { font-size: 14px; font-weight: 700; }
+  .catalogCard .cDesc { font-size: 11px; opacity: 0.8; margin-top: 4px; line-height: 1.4; }
+  .catalogCard .cCost { font-size: 12px; color: #ffd700; margin-top: 8px; font-weight: 700; }
+  .catalogCard button {
+    margin-top: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; border-radius: 7px;
+    border: none; cursor: pointer; background: #4bff8f; color: #05170c;
+  }
+  .catalogCard button:disabled { background: rgba(255,255,255,0.15); color: rgba(255,255,255,.5); cursor: not-allowed; }
+  .catalogCard.owned { border-color: #4bff8f; }
+  .catalogCard.equipped { box-shadow: 0 0 0 2px #4bff8f; }
+  .skinSwatch { width: 100%; height: 60px; border-radius: 8px; margin-bottom: 8px; display:flex; align-items:center; justify-content:center; }
+
+  /* ---- tutorial info ---- */
+  #tutorialInfoScreen h1 { color: #8fa0ff; }
+  .tutStep { font-size: 13px; opacity: 0.9; margin: 6px 0; text-align: left; max-width: 420px; }
+
+  /* ---- touch controls ---- */
+  #touch {
+    position: absolute; bottom: 0; left: 0; right: 0; display: none;
+    justify-content: space-between; padding: 18px; box-sizing: border-box; pointer-events: none;
+  }
+  #touch button {
+    pointer-events: auto; width: 62px; height: 62px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,0.18); color: #fff; font-size: 22px; font-weight: 700; backdrop-filter: blur(4px);
+  }
+  #touch .left-group { display: flex; gap: 10px; }
+  @media (pointer: coarse) { #touch { display: flex; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud" style="display:none;">
+    <div id="hudLeft">
+      <div class="worldName" id="hudWorldName">World</div>
+      <div class="sub" id="hudDiff">Normal</div>
+      <div id="altRow">0m</div>
+      <div id="targetRow">Target: 0m</div>
+      <div id="coinRow">0 coins</div>
+    </div>
+    <div id="hudRight">
+      <div id="livesRow"></div>
+    </div>
+  </div>
+  <div id="buffRow"></div>
+
+  <div class="screen show" id="lobbyScreen">
+    <h1>Alien Outpost Ascent</h1>
+    <p>Climb as high as you can! Don't let the glowing goo catch you. Beat a level to unlock the next one.</p>
+    <div id="coinBanner">0 coins</div>
+    <div class="topRow">
+      <button class="secondaryBtn" id="openShopBtn">UPGRADES</button>
+      <button class="secondaryBtn" id="openSkinsBtn">SKIN CATALOG</button>
+    </div>
+    <div id="diffRow"></div>
+    <div id="tutorialCard">
+      <span>New here? The tutorial level walks you through moving platforms, turrets, and coins.</span>
+      <span style="font-weight:700;color:#8fa0ff;">PLAY &#8594;</span>
+    </div>
+    <div id="worldGrid"></div>
+    <div id="levelRow" style="display:none;">
+      <div style="font-size:12px;opacity:.8;margin-bottom:8px;" id="levelRowTitle"></div>
+      <div id="levelChips"></div>
+    </div>
+    <button class="primaryBtn" id="lobbyStartBtn" disabled>Select a level</button>
+  </div>
+
+  <div class="screen" id="shopScreen">
+    <h1 style="color:#ffd700;">Upgrades</h1>
+    <div id="coinBanner2" style="color:#ffd700;font-weight:700;margin-bottom:6px;"></div>
+    <p>Permanent upgrades, paid for with coins collected while climbing.</p>
+    <div class="catalogGrid" id="shopGrid"></div>
+    <button class="primaryBtn" id="shopBackBtn">BACK TO LOBBY</button>
+  </div>
+
+  <div class="screen" id="skinsScreen">
+    <h1 style="color:#ff8fe6;">Skin Catalog</h1>
+    <p>Play as aliens straight out of Alien TD. Some unlock with coins, some by clearing worlds.</p>
+    <div class="catalogGrid" id="skinsGrid"></div>
+    <button class="primaryBtn" id="skinsBackBtn">BACK TO LOBBY</button>
+  </div>
+
+  <div class="screen" id="tutorialInfoScreen">
+    <h1>How to survive</h1>
+    <div class="tutStep">&#8592; &#8594; or A / D &mdash; move</div>
+    <div class="tutStep">Space / W / &#8593; &mdash; jump (buy Double Jump in Upgrades for a second one)</div>
+    <div class="tutStep">Standing on a moving platform carries you with it &mdash; don't step off mid-air.</div>
+    <div class="tutStep">Turret platforms are drawn as their real Alien TD tower &mdash; watch the charge glow and dodge.</div>
+    <div class="tutStep">Gold coins bank permanently. Floating icons are power-ups: shield, speed, high jump, or an extra life.</div>
+    <div class="tutStep">Levels start gentle and get harder in order &mdash; the plasma is slow on Level 1 of World 1 and fastest near the top of World 10.</div>
+    <button class="primaryBtn" id="startTutorialLevelBtn">Start tutorial level</button>
+    <button class="secondaryBtn" id="skipTutorialBtn">Skip to lobby</button>
+  </div>
+
+  <div class="screen" id="deadScreen">
+    <h1 id="deadTitle">Out of lives</h1>
+    <p id="deadDesc"></p>
+    <button class="primaryBtn" id="retryBtn">Retry</button>
+    <button class="secondaryBtn" id="deadLobbyBtn">Back to lobby</button>
+  </div>
+
+  <div class="screen" id="winScreen">
+    <h1 id="winTitle">Level cleared</h1>
+    <p id="winDesc"></p>
+    <div id="worldClearBox" style="display:none;margin-top:8px;color:#ffd700;font-weight:700;font-size:13px;"></div>
+    <button class="primaryBtn" id="winLobbyBtn">Back to lobby</button>
+  </div>
+
+  <div id="touch">
+    <div class="left-group">
+      <button id="btnLeft">&#8592;</button>
+      <button id="btnRight">&#8594;</button>
+    </div>
+    <button id="btnJump">&#8593;</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+/* ================= SAVE DATA ================= */
+const SAVE_KEY = 'alienAscentSave_v2';
+function defaultSave() {
+  return {
+    coins: 0,
+    unlockedSkins: ['normal'],
+    selectedSkin: 'normal',
+    upgrades: { doubleJump:false, extraLife:false, magnet:false },
+    completedLevels: [], // global indices 0..29
+    tutorialDone: false
+  };
+}
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) return Object.assign(defaultSave(), JSON.parse(raw));
+  } catch (e) {}
+  return defaultSave();
+}
+function persistSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
+let save = loadSave();
+
+/* ================= WORLDS (matches Alien TD's 10 sectors exactly) ================= */
+const LEVELS_PER_WORLD = 3;
+const WORLDS = [
+  { key:'hacker',     name:'The Mainframe',    bg:['#0d1710','#050a06'], platform:'#0f3a18', turretType:'hacktower',     turretName:'Firewall Breaker',  color:'#39ff14' },
+  { key:'volcano',    name:'Magma Depths',     bg:['#2a0f05','#150703'], platform:'#3a1508', turretType:'magmacannon',   turretName:'Magma Cannon',      color:'#ff6a00' },
+  { key:'arctic',     name:'Frozen Wastes',    bg:['#122631','#08151c'], platform:'#284b5c', turretType:'frostlance',    turretName:'Frost Lance',       color:'#aeeaff' },
+  { key:'desert',     name:'Dune Sea',         bg:['#2c2210','#170f06'], platform:'#4a3a1a', turretType:'sandreaper',    turretName:'Sand Reaper',       color:'#ffcf6b' },
+  { key:'space',      name:'Deep Space',       bg:['#0a0a1c','#05050f'], platform:'#12122a', turretType:'voidray',       turretName:'Void Ray',          color:'#c9d6ff' },
+  { key:'swamp',      name:'Toxic Swamp',      bg:['#101c08','#080f03'], platform:'#1c2a10', turretType:'swampmaw',      turretName:'Swamp Maw',         color:'#8aff33' },
+  { key:'cyberpunk',  name:'Neon City',        bg:['#1a0620','#0c0311'], platform:'#2a0a2a', turretType:'neonblade',     turretName:'Neon Blade Array',  color:'#ff2fd0' },
+  { key:'graveyard',  name:'Haunted Grounds',  bg:['#161619','#0a0a0c'], platform:'#26262e', turretType:'phantomtrap',   turretName:'Phantom Trap',      color:'#b7ffcf' },
+  { key:'underwater', name:'The Abyss',        bg:['#04222e','#021218'], platform:'#04283a', turretType:'krakenharpoon', turretName:'Kraken Harpoon',    color:'#33bbff' },
+  { key:'hive',       name:'The Hive Core',    bg:['#1c0410','#0c0208'], platform:'#2a0512', turretType:'hivespike',     turretName:'Hive Spike',        color:'#ff1155' }
+];
+function levelTarget(worldIdx, lvl) { return 140 + worldIdx*55 + lvl*65; }
+function globalIndex(worldIdx, lvl) { return worldIdx*LEVELS_PER_WORLD + lvl; }
+
+/* Global difficulty curve, keyed only by absolute level index (0..29) -
+   this is what makes the run start easy and ramp up in order instead of
+   being randomly brutal from level 1. */
+function curveFor(gi) {
+  return {
+    lavaBase: 0.13 + gi*0.007,
+    lavaAccelDiv: Math.max(9000, 17000 - gi*230),
+    turretCap: Math.min(0.30, 0.01 + gi*0.0095),
+    turretBase: 0.01 + gi*0.0035,
+    movingChance: Math.min(0.32, 0.06 + gi*0.008),
+    fireTimerBase: Math.max(75, 175 - gi*3.2),
+    projSpeedBase: 2.8 + Math.min(1.6, gi*0.055),
+    gapMin: 68 + Math.min(18, gi*0.35),
+    gapMax: 98 + Math.min(26, gi*0.45)
+  };
+}
+
+const DIFFICULTIES = {
+  easy:   { name:'Easy',   lives:5, lavaMul:0.65, turretMul:0.55 },
+  normal: { name:'Normal', lives:4, lavaMul:0.9,  turretMul:0.85 },
+  hard:   { name:'Hard',   lives:3, lavaMul:1.15, turretMul:1.15 }
+};
+
+/* ================= SKIN CATALOG (pulled from Alien TD's actual enemy roster) ================= */
+const SKINS = [
+  { id:'normal',   name:'Grunt',           color:'#ffff00', unlock:'default' },
+  { id:'glitch',   name:'Glitch Wisp',     color:'#39ff14', unlock:'coins', cost:30 },
+  { id:'runner',   name:'Runner',          color:'#ff8a00', unlock:'world', world:2 },
+  { id:'shielded', name:'Shielded Drone',  color:'#00d4ff', unlock:'coins', cost:80 },
+  { id:'tank',     name:'Tank',            color:'#ff0000', unlock:'world', world:5, big:true },
+  { id:'cloaked',  name:'Cloaked Stalker', color:'#8a8a8a', unlock:'coins', cost:120 },
+  { id:'wraith',   name:'Data Wraith',     color:'#ff2fd0', unlock:'world', world:8 },
+  { id:'impostor', name:'The Impostor',    color:'#c51111', unlock:'world', world:10, isImpostor:true }
+];
+function worldsCompletedCount() {
+  let n = 0;
+  for (let w = 0; w < WORLDS.length; w++) { if (save.completedLevels.includes(globalIndex(w, LEVELS_PER_WORLD-1))) n++; else break; }
+  return n;
+}
+function refreshWorldUnlockSkins() {
+  const cleared = worldsCompletedCount();
+  let changed = false;
+  SKINS.forEach(s => {
+    if (s.unlock === 'world' && cleared >= s.world && !save.unlockedSkins.includes(s.id)) {
+      save.unlockedSkins.push(s.id); changed = true;
+    }
+  });
+  if (changed) persistSave();
+}
+function isSkinUnlocked(id) { return save.unlockedSkins.includes(id); }
+function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
+
+/* ================= UPGRADE CATALOG ================= */
+const UPGRADES = [
+  { id:'doubleJump', name:'Double Jump',  cost:60, desc:'Press jump again in mid-air for a second boost.' },
+  { id:'extraLife',  name:'Reinforced Core', cost:50, desc:'+1 life on every run, every difficulty.' },
+  { id:'magnet',     name:'Coin Magnet',  cost:40, desc:'Pickup radius roughly doubles for coins and power-ups.' }
+];
+
+/* ================= CONSTANTS ================= */
+const GRAVITY = 0.55;
+const MOVE_SPEED = 4.2;
+const JUMP_VEL = -12.2;
+const DOUBLE_JUMP_VEL = -10.4;
+const PLATFORM_H = 16;
+const PLAYER_W = 30;
+const PLAYER_H = 34;
+
+/* ================= STATE ================= */
+let screen = 'lobby';
+let selectedWorld = null;
+let selectedLevel = null;
+let selectedDiff = 'normal';
+let isTutorialRun = false;
+
+let platforms, powerups, turretShots, player, camY, lavaY, lavaSpeed, elapsedFrames;
+let lives, maxLives, invincibleTimer;
+let buffs;
+let groundY;
+let runCoins = 0;
+let curveNow = curveFor(0);
+
+const keys = {};
+window.addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp',' ','a','d','w','A','D','W'].includes(e.key)) e.preventDefault();
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === ' ') keys['space'] = true;
+});
+window.addEventListener('keyup', e => {
+  keys[e.key.toLowerCase()] = false;
+  if (e.key === ' ') keys['space'] = false;
+});
+function bindHold(id, key) {
+  const el = document.getElementById(id);
+  const on = ev => { ev.preventDefault(); keys[key] = true; };
+  const off = ev => { ev.preventDefault(); keys[key] = false; };
+  el.addEventListener('touchstart', on); el.addEventListener('touchend', off); el.addEventListener('touchcancel', off);
+  el.addEventListener('mousedown', on); el.addEventListener('mouseup', off); el.addEventListener('mouseleave', off);
+}
+bindHold('btnLeft', 'arrowleft');
+bindHold('btnRight', 'arrowright');
+bindHold('btnJump', 'space');
+
+/* ================= SCREEN HELPERS ================= */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('show'));
+  if (id) document.getElementById(id).classList.add('show');
+}
+function setHudVisible(v) { document.getElementById('hud').style.display = v ? 'flex' : 'none'; }
+
+/* ================= LOBBY ================= */
+function isWorldUnlocked(w) { return w === 0 || save.completedLevels.includes(globalIndex(w-1, LEVELS_PER_WORLD-1)); }
+function isLevelUnlocked(w, lvl) {
+  if (!isWorldUnlocked(w)) return false;
+  if (lvl === 0) return true;
+  return save.completedLevels.includes(globalIndex(w, lvl-1));
+}
+function isLevelDone(w, lvl) { return save.completedLevels.includes(globalIndex(w, lvl)); }
+
+function renderCoinBanners() {
+  document.getElementById('coinBanner').textContent = save.coins + ' coins';
+  const b2 = document.getElementById('coinBanner2'); if (b2) b2.textContent = save.coins + ' coins';
+}
+
+function renderDiffRow() {
+  const row = document.getElementById('diffRow');
+  row.innerHTML = '';
+  Object.keys(DIFFICULTIES).forEach(k => {
+    const b = document.createElement('button');
+    b.className = 'diffBtn' + (k === selectedDiff ? ' active' : '');
+    b.textContent = DIFFICULTIES[k].name;
+    b.onclick = () => { selectedDiff = k; renderDiffRow(); };
+    row.appendChild(b);
+  });
+}
+
+function renderWorldGrid() {
+  const grid = document.getElementById('worldGrid');
+  grid.innerHTML = '';
+  WORLDS.forEach((w, i) => {
+    const unlocked = isWorldUnlocked(i);
+    let doneCount = 0;
+    for (let l = 0; l < LEVELS_PER_WORLD; l++) if (isLevelDone(i, l)) doneCount++;
+    const card = document.createElement('div');
+    card.className = 'worldCard' + (unlocked ? '' : ' locked') + (selectedWorld === i ? ' selected' : '');
+    card.style.background = w.bg[0];
+    card.style.color = w.color;
+    card.innerHTML = `
+      <div>
+        <div class="wName">${i + 1}. ${w.name}</div>
+        <div class="wSub">${unlocked ? 'Tap to pick a level' : 'Locked'}</div>
+      </div>
+      <div class="wProg">${unlocked ? doneCount + ' / ' + LEVELS_PER_WORLD + ' cleared' : ''}</div>
+      <div class="wTurret">Guarded by: ${w.turretName}</div>
+    `;
+    if (unlocked) {
+      card.onclick = () => {
+        selectedWorld = i; selectedLevel = null;
+        renderWorldGrid(); renderLevelRow();
+        document.getElementById('lobbyStartBtn').disabled = true;
+        document.getElementById('lobbyStartBtn').textContent = 'Select a level';
+      };
+    }
+    grid.appendChild(card);
+  });
+}
+
+function renderLevelRow() {
+  const row = document.getElementById('levelRow');
+  if (selectedWorld === null) { row.style.display = 'none'; return; }
+  row.style.display = 'block';
+  const w = WORLDS[selectedWorld];
+  document.getElementById('levelRowTitle').textContent = w.name + ' — choose a level';
+  const chips = document.getElementById('levelChips');
+  chips.innerHTML = '';
+  for (let l = 0; l < LEVELS_PER_WORLD; l++) {
+    const unlocked = isLevelUnlocked(selectedWorld, l);
+    const done = isLevelDone(selectedWorld, l);
+    const chip = document.createElement('div');
+    chip.className = 'levelChip' + (unlocked ? '' : ' locked') + (selectedLevel === l ? ' selected' : '');
+    chip.innerHTML = `<div class="lName">Level ${l+1}${done ? ' &#10003;' : ''}</div><div class="lSub">Target: ${levelTarget(selectedWorld,l)}m</div>`;
+    if (unlocked) {
+      chip.onclick = () => {
+        selectedLevel = l; renderLevelRow();
+        const btn = document.getElementById('lobbyStartBtn');
+        btn.disabled = false;
+        btn.textContent = 'Deploy — ' + w.name + ' L' + (l+1);
+      };
+    }
+    chips.appendChild(chip);
+  }
+}
+
+function openLobby() {
+  screen = 'lobby';
+  setHudVisible(false);
+  showScreen('lobbyScreen');
+  refreshWorldUnlockSkins();
+  renderCoinBanners();
+  renderDiffRow();
+  renderWorldGrid();
+  renderLevelRow();
+  document.getElementById('lobbyStartBtn').disabled = (selectedWorld === null || selectedLevel === null);
+  if (!save.tutorialDone) { showScreen(null); openTutorialInfo(); }
+}
+document.getElementById('lobbyStartBtn').addEventListener('click', () => {
+  if (selectedWorld === null || selectedLevel === null) return;
+  isTutorialRun = false;
+  startRun(selectedWorld, selectedLevel, selectedDiff);
+});
+document.getElementById('tutorialCard').addEventListener('click', openTutorialInfo);
+
+/* ================= SHOP ================= */
+function openShop() {
+  showScreen('shopScreen');
+  renderCoinBanners();
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  UPGRADES.forEach(u => {
+    const owned = !!save.upgrades[u.id];
+    const card = document.createElement('div');
+    card.className = 'catalogCard' + (owned ? ' owned' : '');
+    card.innerHTML = `
+      <div class="cName">${u.name}</div>
+      <div class="cDesc">${u.desc}</div>
+      <div class="cCost">${owned ? 'OWNED' : u.cost + ' coins'}</div>
+    `;
+    if (!owned) {
+      const btn = document.createElement('button');
+      btn.textContent = 'BUY';
+      btn.disabled = save.coins < u.cost;
+      btn.onclick = () => {
+        if (save.coins < u.cost) return;
+        save.coins -= u.cost;
+        save.upgrades[u.id] = true;
+        persistSave();
+        openShop();
+      };
+      card.appendChild(btn);
+    }
+    grid.appendChild(card);
+  });
+}
+document.getElementById('openShopBtn').addEventListener('click', openShop);
+document.getElementById('shopBackBtn').addEventListener('click', openLobby);
+
+/* ================= SKINS ================= */
+function openSkins() {
+  refreshWorldUnlockSkins();
+  showScreen('skinsScreen');
+  const grid = document.getElementById('skinsGrid');
+  grid.innerHTML = '';
+  SKINS.forEach(s => {
+    const unlocked = isSkinUnlocked(s.id);
+    const equipped = save.selectedSkin === s.id;
+    const card = document.createElement('div');
+    card.className = 'catalogCard' + (unlocked ? ' owned' : '') + (equipped ? ' equipped' : '');
+    const swatch = document.createElement('div');
+    swatch.className = 'skinSwatch';
+    swatch.style.background = 'radial-gradient(circle,' + s.color + '33,#00000000)';
+    const mini = document.createElement('canvas'); mini.width = 60; mini.height = 60;
+    swatch.appendChild(mini);
+    card.appendChild(swatch);
+    const info = document.createElement('div');
+    info.innerHTML = `<div class="cName" style="color:${s.color}">${s.name}</div>
+      <div class="cDesc">${unlocked ? (equipped ? 'Equipped' : 'Unlocked') : (s.unlock === 'coins' ? s.cost + ' coins to unlock' : 'Clear ' + s.world + ' worlds to unlock')}</div>`;
+    card.appendChild(info);
+    if (unlocked) {
+      const btn = document.createElement('button');
+      btn.textContent = equipped ? 'EQUIPPED' : 'EQUIP';
+      btn.disabled = equipped;
+      btn.onclick = () => { save.selectedSkin = s.id; persistSave(); openSkins(); };
+      card.appendChild(btn);
+    } else if (s.unlock === 'coins') {
+      const btn = document.createElement('button');
+      btn.textContent = 'UNLOCK';
+      btn.disabled = save.coins < s.cost;
+      btn.onclick = () => {
+        if (save.coins < s.cost) return;
+        save.coins -= s.cost; save.unlockedSkins.push(s.id); persistSave(); openSkins();
+      };
+      card.appendChild(btn);
+    }
+    grid.appendChild(card);
+    drawSkinPreview(mini.getContext('2d'), s, 30, 34);
+  });
+}
+document.getElementById('openSkinsBtn').addEventListener('click', openSkins);
+document.getElementById('skinsBackBtn').addEventListener('click', openLobby);
+
+function drawSkinPreview(c, skin, cx, cy) {
+  const savedCtx = ctx;
+  window.__previewCtx = c;
+  drawAlienWithCtx(c, cx, cy, 1, 0, skin, false);
+}
+
+/* ================= TUTORIAL ================= */
+function openTutorialInfo() {
+  screen = 'tutorialInfo';
+  setHudVisible(false);
+  showScreen('tutorialInfoScreen');
+}
+document.getElementById('skipTutorialBtn').addEventListener('click', () => { save.tutorialDone = true; persistSave(); openLobby(); });
+document.getElementById('startTutorialLevelBtn').addEventListener('click', () => {
+  isTutorialRun = true;
+  startRun(0, 0, 'easy', true);
+});
+
+/* ================= PLATFORM / POWERUP GENERATION ================= */
+const POWERUP_WEIGHTS = [ ['coin',5], ['shield',1], ['speed',1], ['jump',1], ['life',0.4] ];
+function pickPowerupType() {
+  const total = POWERUP_WEIGHTS.reduce((s,p) => s+p[1], 0);
+  let r = Math.random()*total;
+  for (const [type,w] of POWERUP_WEIGHTS) { if (r < w) return type; r -= w; }
+  return 'coin';
+}
+
+function genPlatformsAbove(topY, count) {
+  let y = topY;
+  const diff = DIFFICULTIES[selectedDiff];
+  for (let i = 0; i < count; i++) {
+    y -= curveNow.gapMin + Math.random()*(curveNow.gapMax-curveNow.gapMin);
+    const width = 70 + Math.random() * 90;
+    const x = Math.random() * (W - width);
+    const climbed = groundY - y;
+    let turretChance = isTutorialRun ? 0 : Math.min(curveNow.turretCap, (curveNow.turretBase + climbed/12000) * diff.turretMul);
+    const isTurret = Math.random() < turretChance;
+    const moving = !isTutorialRun && Math.random() < curveNow.movingChance;
+    platforms.push({
+      x, y, w: width, h: PLATFORM_H,
+      moving, dir: Math.random() < 0.5 ? 1 : -1, speed: 1 + Math.random() * 1.0,
+      turret: isTurret, blink: Math.random() * Math.PI * 2,
+      fireTimer: curveNow.fireTimerBase + Math.random()*40
+    });
+    if (!isTurret && Math.random() < 0.28) {
+      const type = pickPowerupType();
+      powerups.push({ x: x + width / 2, y: y - 26, type, taken: false, bob: Math.random() * Math.PI * 2 });
+    }
+  }
+  return y;
+}
+
+/* ================= RUN LIFECYCLE ================= */
+function startRun(worldIndex, levelIndex, diffKey, tutorial) {
+  isTutorialRun = !!tutorial;
+  selectedWorld = worldIndex;
+  selectedLevel = levelIndex;
+  selectedDiff = diffKey;
+  const world = WORLDS[worldIndex];
+  const diff = DIFFICULTIES[diffKey];
+  const gi = globalIndex(worldIndex, levelIndex);
+  curveNow = curveFor(isTutorialRun ? 0 : gi);
+
+  screen = 'playing';
+  showScreen(null);
+  setHudVisible(true);
+  document.getElementById('hudWorldName').textContent = isTutorialRun ? 'Tutorial run' : (world.name + ' — Level ' + (levelIndex+1));
+  document.getElementById('hudDiff').textContent = isTutorialRun ? 'Guided' : diff.name;
+  document.getElementById('targetRow').textContent = 'Target: ' + (isTutorialRun ? 130 : levelTarget(worldIndex, levelIndex)) + 'm';
+
+  platforms = []; powerups = []; turretShots = [];
+  groundY = H - 60;
+  platforms.push({ x: 0, y: groundY, w: W, h: PLATFORM_H, moving: false, turret: false });
+  genPlatformsAbove(groundY, isTutorialRun ? 10 : 40);
+
+  player = { x: W / 2 - PLAYER_W / 2, y: groundY - PLAYER_H, vx: 0, vy: 0, onGround: true, facing: 1, standingOn: null, jumpsUsed: 0 };
+  camY = 0;
+  lavaY = groundY + 80;
+  lavaSpeed = curveNow.lavaBase * diff.lavaMul;
+  elapsedFrames = 0;
+  maxLives = isTutorialRun ? 99 : (diff.lives + (save.upgrades.extraLife ? 1 : 0));
+  lives = maxLives;
+  invincibleTimer = 0;
+  buffs = { shield: 0, speed: 0, jump: 0 };
+  runCoins = 0;
+
+  renderLivesRow();
+  updateCoinRow();
+  loopRunning = true;
+  requestAnimationFrame(loop);
+}
+
+function renderLivesRow() {
+  const row = document.getElementById('livesRow');
+  row.innerHTML = '';
+  const shown = Math.min(maxLives, 8);
+  for (let i = 0; i < shown; i++) {
+    const d = document.createElement('div');
+    d.className = 'lifeIcon' + (i < lives ? '' : ' lost');
+    row.appendChild(d);
+  }
+}
+function updateCoinRow() { document.getElementById('coinRow').textContent = runCoins + ' coins this run'; }
+function renderBuffChips() {
+  const row = document.getElementById('buffRow');
+  row.innerHTML = '';
+  if (buffs.shield > 0) row.innerHTML += '<div class="buffChip" style="color:#8fd9ff;">SHIELD</div>';
+  if (buffs.speed > 0) row.innerHTML += '<div class="buffChip" style="color:#ffe066;">SPEED</div>';
+  if (buffs.jump > 0) row.innerHTML += '<div class="buffChip" style="color:#c084ff;">HIGH JUMP</div>';
+}
+
+function loseLife() {
+  if (invincibleTimer > 0) return;
+  lives--;
+  renderLivesRow();
+  if (lives <= 0) { endRun('dead'); return; }
+  respawnPlayer();
+  invincibleTimer = 110;
+}
+function respawnPlayer() {
+  let best = null;
+  for (const p of platforms) {
+    if (p.y < lavaY - 90 && p.y > lavaY - 340) { if (!best || p.y > best.y) best = p; }
+  }
+  if (best) { player.x = best.x + best.w / 2 - PLAYER_W / 2; player.y = best.y - PLAYER_H; }
+  else { player.x = W / 2 - PLAYER_W / 2; player.y = camY + 40; }
+  player.vx = 0; player.vy = 0; player.standingOn = null; player.jumpsUsed = 0;
+}
+
+function endRun(result) {
+  loopRunning = false;
+  const climbed = Math.max(0, Math.floor((groundY - player.y) / 10));
+  if (result === 'dead') {
+    screen = 'dead';
+    setHudVisible(false);
+    document.getElementById('deadTitle').textContent = isTutorialRun ? 'Tutorial run ended' : 'Consumed by the plasma';
+    document.getElementById('deadDesc').textContent = 'You reached ' + climbed + 'm and banked ' + runCoins + ' coins before running out of lives.';
+    showScreen('deadScreen');
+  } else if (result === 'won') {
+    screen = 'won';
+    setHudVisible(false);
+    const world = WORLDS[selectedWorld];
+    let worldJustCleared = false;
+    let bonus = 0;
+    if (!isTutorialRun) {
+      const gi = globalIndex(selectedWorld, selectedLevel);
+      if (!save.completedLevels.includes(gi)) {
+        save.completedLevels.push(gi);
+        bonus = 10 + gi*2;
+        save.coins += bonus;
+        if (selectedLevel === LEVELS_PER_WORLD-1) { worldJustCleared = true; save.coins += 25; }
+      }
+      persistSave();
+      refreshWorldUnlockSkins();
+    } else {
+      save.tutorialDone = true; persistSave();
+    }
+    document.getElementById('winTitle').textContent = isTutorialRun ? 'Tutorial complete' : world.name + ' — Level ' + (selectedLevel+1) + ' cleared';
+    document.getElementById('winDesc').textContent = isTutorialRun
+      ? 'You reached ' + climbed + 'm. You are ready for the real climb.'
+      : 'You reached ' + climbed + 'm, banked ' + runCoins + ' run coins' + (bonus ? (' + ' + bonus + ' clear bonus') : '') + '.';
+    const box = document.getElementById('worldClearBox');
+    if (worldJustCleared) { box.style.display = 'block'; box.textContent = world.name + ' fully cleared! +25 bonus coins, next world unlocked.'; }
+    else box.style.display = 'none';
+    showScreen('winScreen');
+  }
+}
+document.getElementById('retryBtn').addEventListener('click', () => startRun(selectedWorld, selectedLevel, selectedDiff, isTutorialRun));
+document.getElementById('deadLobbyBtn').addEventListener('click', openLobby);
+document.getElementById('winLobbyBtn').addEventListener('click', openLobby);
+
+/* ================= UPDATE ================= */
+function update() {
+  elapsedFrames++;
+  const diff = DIFFICULTIES[selectedDiff];
+  const climbed = groundY - player.y;
+  lavaSpeed = (curveNow.lavaBase + climbed / curveNow.lavaAccelDiv) * diff.lavaMul;
+  lavaY -= lavaSpeed;
+
+  if (invincibleTimer > 0) invincibleTimer--;
+  if (buffs.shield > 0) buffs.shield--;
+  if (buffs.speed > 0) buffs.speed--;
+  if (buffs.jump > 0) buffs.jump--;
+  renderBuffChips();
+
+  const moveMul = buffs.speed > 0 ? 1.5 : 1;
+  if (keys['arrowleft'] || keys['a']) { player.vx = -MOVE_SPEED * moveMul; player.facing = -1; }
+  else if (keys['arrowright'] || keys['d']) { player.vx = MOVE_SPEED * moveMul; player.facing = 1; }
+  else player.vx = 0;
+
+  const jumpHeld = keys['arrowup'] || keys['w'] || keys['space'];
+  if (jumpHeld) {
+    if (player.onGround) {
+      player.vy = buffs.jump > 0 ? JUMP_VEL * 1.3 : JUMP_VEL;
+      player.onGround = false; player.standingOn = null; player.jumpsUsed = 1;
+    } else if (save.upgrades.doubleJump && player.jumpsUsed < 2 && player.vy > -2) {
+      player.vy = buffs.jump > 0 ? DOUBLE_JUMP_VEL * 1.25 : DOUBLE_JUMP_VEL;
+      player.jumpsUsed = 2;
+    }
+  }
+
+  player.vy += GRAVITY;
+  if (player.vy > 16) player.vy = 16;
+
+  if (player.onGround && player.standingOn && player.standingOn.moving) {
+    player.x += player.standingOn.dir * player.standingOn.speed;
+  }
+
+  player.x += player.vx;
+  if (player.x < 0) player.x = 0;
+  if (player.x + PLAYER_W > W) player.x = W - PLAYER_W;
+
+  const prevBottom = player.y + PLAYER_H;
+  player.y += player.vy;
+
+  for (const p of platforms) {
+    if (p.moving) { p.x += p.dir * p.speed; if (p.x < 0 || p.x + p.w > W) p.dir *= -1; }
+    if (p.turret) {
+      p.fireTimer--;
+      if (p.fireTimer <= 0 && Math.abs((p.y) - (player.y)) < H && screen === 'playing') {
+        const cx = p.x + p.w / 2, cy = p.y - 10;
+        const dx = (player.x + PLAYER_W / 2) - cx, dy = (player.y + PLAYER_H / 2) - cy;
+        const d = Math.hypot(dx, dy) || 1;
+        const speed = curveNow.projSpeedBase + Math.min(1.2, climbed / 6000);
+        turretShots.push({ x: cx, y: cy, vx: dx / d * speed, vy: dy / d * speed, r: 5 });
+        p.fireTimer = Math.max(55, curveNow.fireTimerBase - climbed / 400);
+      }
+    }
+  }
+
+  player.onGround = false;
+  let standingOnAny = null;
+  for (const p of platforms) {
+    const newBottom = player.y + PLAYER_H;
+    if (player.vy >= 0 && prevBottom <= p.y + 1 && newBottom >= p.y &&
+        player.x + PLAYER_W > p.x && player.x < p.x + p.w) {
+      player.y = p.y - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      standingOnAny = p;
+      player.jumpsUsed = 0;
+    }
+  }
+  player.standingOn = standingOnAny;
+
+  for (const ts of turretShots) { ts.x += ts.vx; ts.y += ts.vy; }
+  turretShots = turretShots.filter(ts => ts.y < lavaY + 400 && ts.y > camY - 400);
+  if (invincibleTimer <= 0 && buffs.shield <= 0) {
+    for (const ts of turretShots) {
+      if (ts.x > player.x - ts.r && ts.x < player.x + PLAYER_W + ts.r &&
+          ts.y > player.y - ts.r && ts.y < player.y + PLAYER_H + ts.r) {
+        turretShots = turretShots.filter(t => t !== ts);
+        loseLife();
+        break;
+      }
+    }
+  }
+
+  const pickupR = save.upgrades.magnet ? 26 : 14;
+  for (const pu of powerups) {
+    if (pu.taken) continue;
+    if (player.x < pu.x + pickupR && player.x + PLAYER_W > pu.x - pickupR && player.y < pu.y + pickupR && player.y + PLAYER_H > pu.y - pickupR) {
+      pu.taken = true;
+      applyPowerup(pu.type);
+    }
+  }
+
+  const targetCamY = player.y - H * 0.45;
+  if (targetCamY < camY) camY = targetCamY;
+
+  const highestPlatformY = platforms.reduce((m, p) => Math.min(m, p.y), Infinity);
+  if (highestPlatformY > camY - H) genPlatformsAbove(highestPlatformY, isTutorialRun ? 6 : 14);
+  platforms = platforms.filter(p => p.y < lavaY + 200);
+  powerups = powerups.filter(p => p.y < lavaY + 200 && !p.taken);
+
+  const currentClimbed = Math.max(0, Math.floor((groundY - player.y) / 10));
+  const target = isTutorialRun ? 130 : levelTarget(selectedWorld, selectedLevel);
+  if (currentClimbed >= target) { endRun('won'); return; }
+
+  if (invincibleTimer <= 0 && buffs.shield <= 0 && player.y + PLAYER_H > lavaY) { loseLife(); }
+  if (player.y - camY > H + 200) { loseLife(); }
+
+  document.getElementById('altRow').textContent = currentClimbed + 'm';
+}
+
+function applyPowerup(type) {
+  if (type === 'shield') buffs.shield = 300;
+  else if (type === 'speed') buffs.speed = 360;
+  else if (type === 'jump') buffs.jump = 360;
+  else if (type === 'life') { if (lives < maxLives) { lives++; renderLivesRow(); } }
+  else if (type === 'coin') { runCoins++; save.coins++; persistSave(); updateCoinRow(); }
+}
+
+/* ================= DRAW: PLAYER (skin-based) ================= */
+function drawAlienWithCtx(targetCtx, px, py, facing, bobY, skin, invincibleBlink) {
+  if (invincibleBlink) return;
+  const w = PLAYER_W, scale = skin.big ? 1.18 : 1;
+  targetCtx.save();
+  targetCtx.translate(px, py + bobY);
+  targetCtx.scale(facing * scale, scale);
+  if (skin.isImpostor) {
+    targetCtx.fillStyle = skin.color;
+    targetCtx.beginPath(); targetCtx.ellipse(0, 4, w/2-2, PLAYER_H/2-2, 0, 0, Math.PI*2); targetCtx.fill();
+    targetCtx.fillStyle = '#9fd8ff';
+    targetCtx.fillRect(-8, -12, 14, 9);
+    targetCtx.fillStyle = '#8a0d0d';
+    targetCtx.fillRect(-9, 12, 7, 12); targetCtx.fillRect(2, 12, 7, 12);
+    targetCtx.restore(); return;
+  }
+  targetCtx.fillStyle = shadeColor(skin.color, -18);
+  targetCtx.beginPath();
+  targetCtx.ellipse(0, 6, w / 2 - 2, PLAYER_H / 2 - 4, 0, 0, Math.PI * 2);
+  targetCtx.fill();
+  targetCtx.fillStyle = skin.color;
+  targetCtx.beginPath();
+  targetCtx.ellipse(0, -8, w / 2, PLAYER_H / 3, 0, 0, Math.PI * 2);
+  targetCtx.fill();
+  targetCtx.strokeStyle = shadeColor(skin.color, -30); targetCtx.lineWidth = 2;
+  targetCtx.beginPath(); targetCtx.moveTo(-6, -18); targetCtx.lineTo(-10, -27); targetCtx.stroke();
+  targetCtx.beginPath(); targetCtx.moveTo(6, -18); targetCtx.lineTo(10, -27); targetCtx.stroke();
+  targetCtx.fillStyle = shadeColor(skin.color, 25);
+  targetCtx.beginPath(); targetCtx.arc(-10, -27, 2.5, 0, Math.PI * 2); targetCtx.fill();
+  targetCtx.beginPath(); targetCtx.arc(10, -27, 2.5, 0, Math.PI * 2); targetCtx.fill();
+  targetCtx.fillStyle = '#f2fff8';
+  targetCtx.beginPath(); targetCtx.ellipse(6, -9, 7, 9, -0.15, 0, Math.PI * 2); targetCtx.fill();
+  targetCtx.fillStyle = '#0c2418';
+  targetCtx.beginPath(); targetCtx.arc(8, -8, 3, 0, Math.PI * 2); targetCtx.fill();
+  if (skin.id === 'shielded') {
+    targetCtx.strokeStyle = 'rgba(255,255,255,.5)'; targetCtx.lineWidth = 1;
+    targetCtx.beginPath(); targetCtx.arc(0, -2, w/2+3, 0, Math.PI*2); targetCtx.stroke();
+  }
+  targetCtx.restore();
+}
+function shadeColor(hex, amt) {
+  hex = hex.replace('#',''); const num = parseInt(hex,16);
+  let r=(num>>16)+amt, g=((num>>8)&255)+amt, b=(num&255)+amt;
+  r=Math.min(255,Math.max(0,r)); g=Math.min(255,Math.max(0,g)); b=Math.min(255,Math.max(0,b));
+  return '#'+(0x1000000+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function drawAlien(px, py, facing, invincible) {
+  const t = elapsedFrames * 0.05;
+  const bobY = player.onGround ? 0 : Math.sin(t * 3) * 1.5;
+  const blink = invincible && Math.floor(elapsedFrames / 4) % 2 === 0;
+  drawAlienWithCtx(ctx, px + PLAYER_W/2, py + PLAYER_H/2, facing, bobY, getSkin(save.selectedSkin), blink);
+}
+
+/* ================= DRAW: TURRETS (matches each Alien TD tower's real art) ================= */
+function drawTurretArt(type, color, chargeGlow) {
+  const now = elapsedFrames;
+  ctx.save();
+  switch (type) {
+    case 'hacktower':
+      ctx.fillStyle = color; ctx.fillRect(-8,-8,16,12);
+      ctx.fillStyle = '#000';
+      for (let i=0;i<2;i++) for (let j=0;j<2;j++) ctx.fillRect(-6+i*8,-6+j*8,3,3);
+      break;
+    case 'magmacannon':
+      ctx.fillStyle = '#332015'; ctx.fillRect(-11,-9,22,14);
+      ctx.fillStyle = color; ctx.globalAlpha = 0.6+0.4*chargeGlow;
+      ctx.beginPath(); ctx.arc(11,-2,4,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+      break;
+    case 'frostlance':
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(-6,-5); ctx.lineTo(-6,5); ctx.closePath(); ctx.fill();
+      break;
+    case 'sandreaper':
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+      for (let i=0;i<3;i++) { const a = now/12 + i*(Math.PI*2/3); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*11,Math.sin(a)*11); ctx.stroke(); }
+      break;
+    case 'voidray':
+      ctx.fillStyle = color; ctx.globalAlpha = 0.85;
+      ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(13,0); ctx.lineTo(-4,6); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    case 'swampmaw':
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(-4,-8); ctx.lineTo(9,-2); ctx.lineTo(-4,0); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-4,8); ctx.lineTo(9,2); ctx.lineTo(-4,0); ctx.closePath(); ctx.fill();
+      break;
+    case 'neonblade':
+      ctx.strokeStyle = color; ctx.lineWidth = 2;
+      for (let i=0;i<4;i++) { const a = i*Math.PI/2 + now/20; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*10,Math.sin(a)*10); ctx.stroke(); }
+      break;
+    case 'phantomtrap':
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.globalAlpha = 0.6+0.4*chargeGlow;
+      ctx.beginPath(); ctx.arc(4,0,8,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha = 1;
+      break;
+    case 'krakenharpoon':
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(4,-5); ctx.lineTo(7,0); ctx.lineTo(4,5); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-6,-2,10,4);
+      break;
+    case 'hivespike':
+      ctx.fillStyle = color;
+      for (let i=0;i<3;i++) { const a = -0.5+i*0.5; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*13,Math.sin(a)*13-3); ctx.lineTo(Math.cos(a)*13,Math.sin(a)*13+3); ctx.closePath(); ctx.fill(); }
+      break;
+    default:
+      ctx.fillStyle = color; ctx.fillRect(-8,-3,16,6);
+  }
+  ctx.restore();
+}
+
+/* ================= DRAW ================= */
+let stars = null;
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 90; i++) stars.push({ x: Math.random() * W, y: Math.random() * H * 3, r: Math.random() * 1.6 + 0.4, tw: Math.random() * Math.PI * 2 });
+}
+
+function draw() {
+  if (!stars) initStars();
+  const world = WORLDS[selectedWorld];
+  ctx.clearRect(0, 0, W, H);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, world.bg[0]); g.addColorStop(1, world.bg[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  const t = elapsedFrames * 0.05;
+  ctx.save();
+  ctx.translate(0, (-camY * 0.4) % (H * 3));
+  for (const s of stars) {
+    const flicker = 0.5 + 0.5 * Math.sin(t * 0.5 + s.tw);
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.15 + flicker * 0.35) + ')';
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(0, -camY);
+
+  for (const p of platforms) {
+    if (p.turret) {
+      ctx.fillStyle = '#20281f';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = world.color;
+      ctx.globalAlpha = 0.7; ctx.fillRect(p.x, p.y, p.w, 3); ctx.globalAlpha = 1;
+      const cx = p.x + p.w / 2;
+      const charge = 1 - Math.max(0, p.fireTimer) / curveNow.fireTimerBase;
+      ctx.save();
+      ctx.translate(cx, p.y - 10);
+      drawTurretArt(world.turretType, world.color, Math.max(0,Math.min(1,charge)));
+      ctx.restore();
+      ctx.fillStyle = '#222';
+      ctx.fillRect(cx - 3, p.y - 16, 6, 6);
+    } else {
+      ctx.fillStyle = world.platform;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.strokeStyle = world.color; ctx.globalAlpha = 0.7; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.w, p.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  for (const pu of powerups) {
+    if (pu.taken) continue;
+    const by = Math.sin(t * 2 + pu.bob) * 4;
+    ctx.save();
+    ctx.translate(pu.x, pu.y + by);
+    const colors = { shield: '#8fd9ff', speed: '#ffe066', jump: '#c084ff', life: '#ff5a7a', coin: '#ffd700' };
+    ctx.fillStyle = colors[pu.type];
+    ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#05101a'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const label = { shield: 'S', speed: '>>', jump: '^', life: '+', coin: '$' }[pu.type];
+    ctx.fillText(label, 0, 1);
+    ctx.restore();
+  }
+
+  for (const ts of turretShots) {
+    ctx.fillStyle = world.color;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.arc(ts.x, ts.y, ts.r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  drawAlien(player.x, player.y, player.facing, invincibleTimer > 0);
+  if (buffs.shield > 0) {
+    ctx.strokeStyle = '#8fd9ff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
+    ctx.beginPath(); ctx.arc(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, PLAYER_W, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  const plasmaTop = lavaY;
+  const lg = ctx.createLinearGradient(0, plasmaTop, 0, plasmaTop + 400);
+  lg.addColorStop(0, world.color);
+  lg.addColorStop(0.15, world.color);
+  lg.addColorStop(1, world.bg[1]);
+  ctx.fillStyle = lg;
+  ctx.fillRect(0, plasmaTop, W, 4000);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  for (let x = 0; x < W; x += 24) {
+    const wave = Math.sin(t + x * 0.05) * 4;
+    ctx.fillRect(x, plasmaTop + wave, 14, 4);
+  }
+
+  ctx.restore();
+}
+
+/* ================= LOOP ================= */
+let loopRunning = false;
+function loop() {
+  if (!loopRunning) return;
+  update();
+  draw();
+  if (loopRunning) requestAnimationFrame(loop);
+}
+
+openLobby();
+</script>
+</body>
+</html>
