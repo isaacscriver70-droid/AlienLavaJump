@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DON'T LOOK BEHIND YOU</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+  #scene-container{ position:fixed; inset:0; }
+  #scene-container canvas{ display:block; }
+
+  #blocker{
+    position:fixed; inset:0; z-index:900;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.88); cursor:pointer; text-align:center; padding:20px;
+  }
+  #blocker .stamp{ font-size:1.4rem; }
+  #blocker .hint{ margin-top:18px; color:var(--fluor-dim); font-size:.85rem; }
+
+  #hud{ position:fixed; inset:0; z-index:400; pointer-events:none; display:none; }
+  #crosshair{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:6px; height:6px; border-radius:50%; background:var(--fluor); opacity:.6;
+  }
+  #button-counter{
+    position:absolute; top:18px; left:18px;
+    font-family:var(--font-mono); font-size:.85rem; color:var(--fluor-dim);
+    letter-spacing:1px; background:rgba(0,0,0,.35); padding:6px 10px; border:1px solid #222;
+  }
+  #button-counter b{ color:var(--fluor); }
+  #button-counter.glitching{ color:var(--red); animation:counterGlitch .15s infinite; }
+  @keyframes counterGlitch{
+    0%{ transform:translate(0,0); } 50%{ transform:translate(1px,-1px); } 100%{ transform:translate(-1px,1px); }
+  }
+
+  #interact-prompt{
+    position:absolute; bottom:22%; left:50%; transform:translate(-50%,0);
+    font-family:var(--font-mono); font-size:.9rem; color:var(--fluor);
+    background:rgba(0,0,0,.5); padding:6px 14px; border:1px solid var(--fluor-dim);
+    opacity:0; transition:opacity .15s;
+  }
+  #interact-prompt.show{ opacity:1; }
+
+  #caption{
+    position:absolute; bottom:14%; left:50%; transform:translate(-50%,0);
+    font-family:var(--font-display); font-size:1.15rem; color:var(--fluor);
+    text-shadow:0 0 10px rgba(217,232,201,.4);
+    max-width:70%; text-align:center;
+    opacity:0; transition:opacity .3s;
+  }
+  #caption.show{ opacity:1; }
+  #caption.warn{ color:var(--red); text-shadow:0 0 10px rgba(200,30,43,.5); }
+
+  #vignette-danger{
+    position:fixed; inset:0; z-index:395; pointer-events:none;
+    box-shadow:inset 0 0 160px 40px rgba(200,30,43,0);
+    transition:box-shadow .8s;
+  }
+
+  #fade{
+    position:fixed; inset:0; z-index:950; background:#000; opacity:0;
+    pointer-events:none; transition:opacity 1.4s;
+  }
+  #fade.show{ opacity:1; }
+
+  #pause-menu{
+    position:fixed; inset:0; z-index:920; display:none;
+    align-items:center; justify-content:center; background:rgba(0,0,0,.8);
+  }
+  #jumpscare-flash{
+    position:fixed; inset:0; z-index:940; background:#000; opacity:0; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div class="crt-overlay"></div>
+<div id="vignette-danger"></div>
+<div id="jumpscare-flash"></div>
+<div id="fade"></div>
+
+<div id="scene-container"></div>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="button-counter">BUTTON PRESSED: <b id="press-count">0</b></div>
+  <div id="interact-prompt">[ SPACE ] PRESS THE BUTTON</div>
+  <div id="caption"></div>
+</div>
+
+<div id="blocker">
+  <div>
+    <div class="stamp">CLICK TO ENTER</div>
+    <div class="hint">Mouse to look &middot; WASD to walk &middot; SPACE to press &middot; ESC to pause</div>
+  </div>
+</div>
+
+<div id="pause-menu">
+  <div class="report-screen" style="position:static;">
+    <h1 class="report-title" style="font-size:2.2rem;">PAUSED</h1>
+    <div class="report-controls">
+      <b>W A S D</b> move &nbsp;&middot;&nbsp; <b>MOUSE</b> look &nbsp;&middot;&nbsp; <b>SHIFT</b> run<br>
+      <b>SPACE</b> press the button &nbsp;&middot;&nbsp; <b>ESC</b> resume
+    </div>
+    <div style="display:flex;gap:16px;">
+      <button id="resume-btn">RESUME</button>
+      <a class="btn" href="index.html" style="border-color:var(--fluor-dim);">QUIT TO MENU</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="shared/audio.js"></script>
+<script src="shared/endings.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

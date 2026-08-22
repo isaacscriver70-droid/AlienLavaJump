@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>You Made It</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="crt-overlay"></div>
+<div class="report-screen">
+  <div class="stamp" style="border-color:var(--fluor);color:var(--fluor);">CASE CLOSED</div>
+  <h1 class="report-title">YOU MADE IT</h1>
+  <div class="report-sub">
+    The door closes behind you. The hallway, and whatever was in it, stays on the other side.
+    <br><br>
+    Somewhere behind that door, a button clicks. Once. On its own.
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+    <a class="btn" href="game.html">WALK IT AGAIN</a>
+    <a class="btn" href="index.html" style="border-color:var(--fluor-dim);">RETURN TO MENU</a>
+  </div>
+</div>
+<script src="shared/endings.js"></script>
+<script>markEndingSeen("good");</script>
+</body>
+</html>

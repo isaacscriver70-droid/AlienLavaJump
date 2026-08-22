@@ -1,0 +1,140 @@
+// =======================================================================
+// AUDIO ENGINE - every sound here is synthesized at runtime with the
+// Web Audio API (oscillators + filtered noise). No external sound
+// files are used anywhere in this game.
+// =======================================================================
+const SFX=(function(){
+  let ctx=null;
+  let muted=false;
+  let droneNodes=null;
+  let breathNodes=null;
+
+  function ensureCtx(){
+    if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==="suspended") ctx.resume();
+    return ctx;
+  }
+
+  function noiseBuffer(duration){
+    const c=ensureCtx();
+    const buf=c.createBuffer(1, c.sampleRate*duration, c.sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1;
+    return buf;
+  }
+
+  function master(){
+    const c=ensureCtx();
+    const g=c.createGain();
+    g.gain.value=muted?0:1;
+    g.connect(c.destination);
+    return g;
+  }
+
+  function tone(freq,dur,type,vol,glideTo){
+    if(muted) return;
+    const c=ensureCtx();
+    const osc=c.createOscillator();
+    const g=c.createGain();
+    osc.type=type||"sine";
+    osc.frequency.setValueAtTime(freq,c.currentTime);
+    if(glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo,c.currentTime+dur);
+    g.gain.setValueAtTime(vol||.25,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
+    osc.connect(g); g.connect(master());
+    osc.start(); osc.stop(c.currentTime+dur+.02);
+  }
+
+  function noiseBurst(dur,filterFreq,vol){
+    if(muted) return;
+    const c=ensureCtx();
+    const src=c.createBufferSource();
+    src.buffer=noiseBuffer(dur);
+    const filt=c.createBiquadFilter();
+    filt.type="bandpass";
+    filt.frequency.value=filterFreq||800;
+    filt.Q.value=.7;
+    const g=c.createGain();
+    g.gain.setValueAtTime(vol||.3,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
+    src.connect(filt); filt.connect(g); g.connect(master());
+    src.start();
+  }
+
+  function buttonClick(){ tone(180,.08,"square",.3); tone(90,.05,"square",.15); }
+  function footstep(){ noiseBurst(.06,220,.18); }
+  function doorOpen(){ tone(60,.9,"sawtooth",.15,40); }
+  function lightBuzzOn(){ tone(220,.4,"square",.05); }
+  function stinger(){
+    noiseBurst(.5,1200,.5);
+    tone(55,.7,"sawtooth",.4,30);
+    tone(900,.15,"square",.2);
+  }
+  function thud(){ noiseBurst(.3,120,.4); }
+  function whisper(){ noiseBurst(1.2,2400,.06); }
+  function chickenCluck(){
+    tone(600,.08,"square",.2,900);
+    setTimeout(()=>tone(500,.08,"square",.2,850),90);
+  }
+  function staticBurst(dur){ noiseBurst(dur||.4,3000,.15); }
+  function glitchBeep(){ tone(1200,.05,"square",.15); }
+
+  function startDrone(){
+    if(muted||droneNodes) return;
+    const c=ensureCtx();
+    const osc=c.createOscillator();
+    const osc2=c.createOscillator();
+    const g=c.createGain();
+    osc.type="sine"; osc.frequency.value=48;
+    osc2.type="sine"; osc2.frequency.value=50.5;
+    g.gain.value=.05;
+    osc.connect(g); osc2.connect(g); g.connect(master());
+    osc.start(); osc2.start();
+    droneNodes={osc,osc2,g};
+  }
+  function stopDrone(){
+    if(!droneNodes) return;
+    try{ droneNodes.osc.stop(); droneNodes.osc2.stop(); }catch(e){}
+    droneNodes=null;
+  }
+  function setDroneIntensity(t){ // t = 0..1, gets louder/lower as danger rises
+    if(!droneNodes) return;
+    droneNodes.g.gain.setTargetAtTime(.03+t*.14, ensureCtx().currentTime, .5);
+    droneNodes.osc.frequency.setTargetAtTime(48-t*10, ensureCtx().currentTime, 1);
+  }
+
+  function startBreathing(){
+    if(muted||breathNodes) return;
+    const c=ensureCtx();
+    const src=c.createBufferSource();
+    src.buffer=noiseBuffer(2); src.loop=true;
+    const filt=c.createBiquadFilter(); filt.type="lowpass"; filt.frequency.value=400;
+    const g=c.createGain(); g.gain.value=0;
+    const lfo=c.createOscillator(); lfo.frequency.value=.3;
+    const lfoGain=c.createGain(); lfoGain.gain.value=.04;
+    lfo.connect(lfoGain); lfoGain.connect(g.gain);
+    src.connect(filt); filt.connect(g); g.connect(master());
+    src.start(); lfo.start();
+    breathNodes={src,g,lfo};
+  }
+  function stopBreathing(){
+    if(!breathNodes) return;
+    try{ breathNodes.src.stop(); breathNodes.lfo.stop(); }catch(e){}
+    breathNodes=null;
+  }
+  function setBreathingVolume(v){ if(breathNodes) breathNodes.g.gain.setTargetAtTime(v, ensureCtx().currentTime, .3); }
+
+  function setMuted(v){
+    muted=v;
+    if(muted) { stopDrone(); stopBreathing(); }
+  }
+
+  return {
+    ensureCtx, buttonClick, footstep, doorOpen, lightBuzzOn, stinger, thud,
+    whisper, chickenCluck, staticBurst, glitchBeep,
+    startDrone, stopDrone, setDroneIntensity,
+    startBreathing, stopBreathing, setBreathingVolume,
+    setMuted
+  };
+})();
+window.SFX=SFX;

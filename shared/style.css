@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:wght@400;700&display=swap');
+
+:root{
+  --bg:#050506;
+  --wall:#171712;
+  --ceiling:#0c0c0a;
+  --fluor:#d9e8c9;
+  --fluor-dim:#7a8a6c;
+  --red:#c81e2b;
+  --yellow:#d4b106;
+  --ink:#c9c7bd;
+  --font-display:'Special Elite', 'Courier New', monospace;
+  --font-mono:'Courier Prime', 'Courier New', monospace;
+}
+
+*{ box-sizing:border-box; }
+
+html,body{
+  margin:0; padding:0; width:100%; height:100%;
+  background:var(--bg); color:var(--ink);
+  font-family:var(--font-mono);
+  overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+}
+
+/* ---------------------------------------------------------------------
+   Shared "incident report" chrome - a thin scanline + vignette layer
+   used on every page for the sickly fluorescent-lit facility feel.
+--------------------------------------------------------------------- */
+.crt-overlay{
+  position:fixed; inset:0; pointer-events:none; z-index:500;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0px, rgba(0,0,0,.18) 1px, transparent 2px, transparent 3px),
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,.65) 100%);
+  mix-blend-mode:multiply;
+}
+
+.stamp{
+  font-family:var(--font-display);
+  letter-spacing:2px;
+  color:var(--red);
+  border:2px solid var(--red);
+  padding:.2em .6em;
+  display:inline-block;
+  transform:rotate(-3deg);
+  opacity:.85;
+}
+
+button, .btn{
+  font-family:var(--font-mono);
+  font-weight:700;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  background:transparent;
+  color:var(--fluor);
+  border:1px solid var(--fluor-dim);
+  padding:.9em 2em;
+  cursor:pointer;
+  transition:.2s;
+  text-decoration:none;
+  display:inline-block;
+}
+button:hover, .btn:hover{
+  background:var(--fluor);
+  color:#000;
+  border-color:var(--fluor);
+}
+
+/* ---------------------------------------------------------------------
+   Menu / ending page layout
+--------------------------------------------------------------------- */
+.report-screen{
+  position:fixed; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:26px; text-align:center; padding:30px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(217,232,201,.05), transparent 60%),
+    var(--bg);
+}
+
+.report-title{
+  font-family:var(--font-display);
+  font-size:3.2rem;
+  color:var(--fluor);
+  text-shadow:0 0 18px rgba(217,232,201,.35);
+  letter-spacing:3px;
+  margin:0;
+  line-height:1.15;
+}
+.report-title .warn{ color:var(--red); }
+
+.report-sub{
+  max-width:560px;
+  font-family:var(--font-mono);
+  font-size:.95rem;
+  line-height:1.7;
+  color:#8f8d84;
+}
+
+.report-controls{
+  font-family:var(--font-mono);
+  font-size:.8rem;
+  color:var(--fluor-dim);
+  border-top:1px dashed #333;
+  padding-top:14px;
+  line-height:1.9;
+}
+.report-controls b{ color:var(--fluor); }
+
+.flicker{ animation:flicker 4s infinite; }
+@keyframes flicker{
+  0%,19%,21%,23%,55%,57%,100%{ opacity:1; }
+  20%,22%,56%{ opacity:.4; }
+}
+
+.endings-tracker{
+  font-family:var(--font-mono);
+  font-size:.78rem;
+  letter-spacing:1px;
+  color:var(--fluor-dim);
+}
+.endings-tracker span.found{ color:var(--fluor); }
