@@ -29,6 +29,20 @@
   }
   #button-counter b{ color:var(--fluor); }
   #button-counter.glitching{ color:var(--red); animation:counterGlitch .15s infinite; }
+
+  #stamina-bar-wrap{
+    position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+    width:220px; height:9px; background:rgba(0,0,0,.45); border:1px solid #333;
+    opacity:0; transition:opacity .3s;
+  }
+  #stamina-bar-wrap.active{ opacity:1; }
+  #stamina-bar-fill{
+    height:100%; width:100%; background:var(--fluor);
+    box-shadow:0 0 8px rgba(217,232,201,.5);
+    transition:width .1s linear, background .2s;
+  }
+  #stamina-bar-fill.low{ background:var(--yellow); }
+  #stamina-bar-fill.depleted{ background:var(--red); box-shadow:0 0 8px rgba(200,30,43,.6); }
   @keyframes counterGlitch{
     0%{ transform:translate(0,0); } 50%{ transform:translate(1px,-1px); } 100%{ transform:translate(-1px,1px); }
   }
@@ -84,6 +98,7 @@
   <div id="crosshair"></div>
   <div id="button-counter">BUTTON PRESSED: <b id="press-count">0</b></div>
   <div id="interact-prompt">[ SPACE ] PRESS THE BUTTON</div>
+  <div id="stamina-bar-wrap"><div id="stamina-bar-fill"></div></div>
   <div id="caption"></div>
 </div>
 

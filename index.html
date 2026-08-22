@@ -30,11 +30,12 @@
 </div>
 
 <script>
-  const ENDS=["good","bad","secret","stupid"];
+  const ENDS=["good","bad","secret"];
   let seen=[];
   try{ seen=JSON.parse(localStorage.getItem("dlby_endings")||"[]"); }catch(e){ seen=[]; }
+  seen=seen.filter(e=>ENDS.includes(e));
   document.getElementById("endings-tracker").innerHTML=
-    "Endings found: "+seen.length+" / 4  &nbsp; "+
+    "Endings found: "+seen.length+" / "+ENDS.length+"  &nbsp; "+
     ENDS.map(e=>`<span class="${seen.includes(e)?'found':''}">[${e.toUpperCase()}]</span>`).join(" ");
 </script>
 </body>

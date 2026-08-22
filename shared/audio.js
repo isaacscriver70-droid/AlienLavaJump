@@ -61,8 +61,24 @@ const SFX=(function(){
     src.start();
   }
 
-  function buttonClick(){ tone(180,.08,"square",.3); tone(90,.05,"square",.15); }
-  function footstep(){ noiseBurst(.06,220,.18); }
+  function buttonClick(){
+    if(muted) return;
+    const c=ensureCtx();
+    // mechanical "thunk" - a short, punchy filtered-noise compression
+    const src=c.createBufferSource();
+    src.buffer=noiseBuffer(0.09);
+    const filt=c.createBiquadFilter(); filt.type="lowpass"; filt.frequency.value=850;
+    const g=c.createGain();
+    g.gain.setValueAtTime(.55,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.09);
+    src.connect(filt); filt.connect(g); g.connect(master());
+    src.start();
+    // low body thump under the thunk
+    tone(65,.13,"sine",.16,42);
+    // spring-loaded release tick, a beat later
+    setTimeout(()=>{ if(!muted) noiseBurst(.025,4200,.2); },40);
+  }
+  function footstep(){ noiseBurst(.05+Math.random()*.03,170+Math.random()*90,.15+Math.random()*.07); }
   function doorOpen(){ tone(60,.9,"sawtooth",.15,40); }
   function lightBuzzOn(){ tone(220,.4,"square",.05); }
   function stinger(){
@@ -72,7 +88,7 @@ const SFX=(function(){
   }
   function thud(){ noiseBurst(.3,120,.4); }
   function whisper(){ noiseBurst(1.2,2400,.06); }
-  function chickenCluck(){
+  function voiceBlip(){
     tone(600,.08,"square",.2,900);
     setTimeout(()=>tone(500,.08,"square",.2,850),90);
   }
@@ -131,7 +147,7 @@ const SFX=(function(){
 
   return {
     ensureCtx, buttonClick, footstep, doorOpen, lightBuzzOn, stinger, thud,
-    whisper, chickenCluck, staticBurst, glitchBeep,
+    whisper, voiceBlip, staticBurst, glitchBeep,
     startDrone, stopDrone, setDroneIntensity,
     startBreathing, stopBreathing, setBreathingVolume,
     setMuted

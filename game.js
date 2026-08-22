@@ -51,18 +51,67 @@ function canvasTexture(draw,w,h){
   t.wrapS=t.wrapT=THREE.RepeatWrapping;
   return t;
 }
+// Fine per-pixel grain, applied under hand-drawn detail so nothing reads as a flat color.
+function addGrain(ctx,w,h,amount){
+  const id=ctx.getImageData(0,0,w,h);
+  for(let i=0;i<id.data.length;i+=4){
+    const n=(Math.random()-0.5)*amount;
+    id.data[i]+=n; id.data[i+1]+=n; id.data[i+2]+=n;
+  }
+  ctx.putImageData(id,0,0);
+}
+
 const floorTex=canvasTexture((ctx,w,h)=>{
   ctx.fillStyle="#0c0c0a"; ctx.fillRect(0,0,w,h);
-  ctx.strokeStyle="#1c1c16"; ctx.lineWidth=2;
+  addGrain(ctx,w,h,14);
+  ctx.strokeStyle="rgba(28,28,22,.9)"; ctx.lineWidth=2;
   for(let i=0;i<=4;i++){ ctx.beginPath(); ctx.moveTo(i*w/4,0); ctx.lineTo(i*w/4,h); ctx.stroke(); }
-},128,128);
+  // scuffed wear streaks and dark stains
+  for(let i=0;i<10;i++){
+    ctx.globalAlpha=.08+Math.random()*.1;
+    ctx.fillStyle=Math.random()<0.5?"#000":"#2a2a20";
+    const rw=10+Math.random()*40, rh=4+Math.random()*10;
+    ctx.fillRect(Math.random()*w,Math.random()*h,rw,rh);
+  }
+  ctx.globalAlpha=1;
+},256,256);
 floorTex.repeat.set(1,1);
 
-const wallMatNormal=new THREE.MeshStandardMaterial({color:0x171712,roughness:0.95});
+const wallTex=canvasTexture((ctx,w,h)=>{
+  ctx.fillStyle="#171712"; ctx.fillRect(0,0,w,h);
+  addGrain(ctx,w,h,16);
+  // vertical grime streaks, like old water damage
+  for(let i=0;i<7;i++){
+    const x=Math.random()*w;
+    const grad=ctx.createLinearGradient(x,0,x,h);
+    grad.addColorStop(0,"rgba(0,0,0,0)");
+    grad.addColorStop(1,`rgba(0,0,0,${0.25+Math.random()*.3})`);
+    ctx.fillStyle=grad;
+    ctx.fillRect(x-8,0,16,h);
+  }
+  // baseboard scuff line
+  ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fillRect(0,h-14,w,14);
+},256,256);
+wallTex.repeat.set(1,1.4);
+
+const ceilingTex=canvasTexture((ctx,w,h)=>{
+  ctx.fillStyle="#0a0a09"; ctx.fillRect(0,0,w,h);
+  addGrain(ctx,w,h,10);
+  ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=3;
+  for(let i=1;i<3;i++){ ctx.beginPath(); ctx.moveTo(0,i*h/3); ctx.lineTo(w,i*h/3); ctx.stroke(); }
+  // faint water-stain rings
+  for(let i=0;i<4;i++){
+    ctx.strokeStyle=`rgba(40,35,25,${0.15+Math.random()*.15})`;
+    ctx.lineWidth=3+Math.random()*4;
+    ctx.beginPath(); ctx.arc(Math.random()*w,Math.random()*h,10+Math.random()*22,0,Math.PI*2); ctx.stroke();
+  }
+},256,256);
+
+const wallMatNormal=new THREE.MeshStandardMaterial({color:0xffffff,map:wallTex,roughness:0.92,metalness:0.03});
 const wallMatDistorted=new THREE.MeshStandardMaterial({color:0x2b1414,roughness:0.9,emissive:0x330000,emissiveIntensity:0.15});
-const floorMat=new THREE.MeshStandardMaterial({color:0x0c0c0a,roughness:1,map:floorTex});
-const ceilingMat=new THREE.MeshStandardMaterial({color:0x08080a,roughness:1});
-const doorMat=new THREE.MeshStandardMaterial({color:0x241a12,roughness:0.8});
+const floorMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.85,metalness:0.05,map:floorTex});
+const ceilingMat=new THREE.MeshStandardMaterial({color:0xffffff,map:ceilingTex,roughness:1});
+const doorMat=new THREE.MeshStandardMaterial({color:0x241a12,roughness:0.75,metalness:0.1});
 
 // ---- Hallway ------------------------------------------------------------
 const CORR_W=3, CORR_H=2.8, SEG_LEN=4;
@@ -120,12 +169,44 @@ scene.add(finalDoor);
 // ---- The main button ------------------------------------------------
 function makeButtonMesh(color){
   const g=new THREE.Group();
-  const plate=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.32,0.05),new THREE.MeshStandardMaterial({color:0x1a1a16}));
-  const btn=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.06,16),
-    new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:0.4}));
-  btn.rotation.x=Math.PI/2; btn.position.z=0.05;
-  g.add(plate,btn);
+  // recessed metal mounting plate with a beveled inset panel
+  const backplate=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.045),
+    new THREE.MeshStandardMaterial({color:0x2a2a28,roughness:0.4,metalness:0.75}));
+  const inset=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.02),
+    new THREE.MeshStandardMaterial({color:0x151513,roughness:0.6,metalness:0.5}));
+  inset.position.z=0.025;
+  // chrome bezel ring around the button
+  const bezel=new THREE.Mesh(new THREE.TorusGeometry(0.13,0.018,10,20),
+    new THREE.MeshStandardMaterial({color:0x8a8a86,roughness:0.25,metalness:0.9}));
+  bezel.position.z=0.05;
+  // short stem the cap sits on
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.1,0.05,16),
+    new THREE.MeshStandardMaterial({color:new THREE.Color(color).multiplyScalar(0.5),roughness:0.5,metalness:0.2}));
+  stem.rotation.x=Math.PI/2; stem.position.z=0.06;
+  // rounded mushroom cap - a hemisphere, the classic industrial push-button shape
+  const cap=new THREE.Mesh(
+    new THREE.SphereGeometry(0.11,20,12,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color,roughness:0.3,metalness:0.15,emissive:color,emissiveIntensity:0.35})
+  );
+  cap.rotation.x=-Math.PI/2; cap.position.z=0.085;
+  // four bolt heads in the corners of the backplate, for detail
+  const boltMat=new THREE.MeshStandardMaterial({color:0x1c1c1a,roughness:0.4,metalness:0.7});
+  [[-0.17,-0.17],[0.17,-0.17],[-0.17,0.17],[0.17,0.17]].forEach(([bx,by])=>{
+    const bolt=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.018,0.02,8),boltMat);
+    bolt.rotation.x=Math.PI/2; bolt.position.set(bx,by,0.03);
+    g.add(bolt);
+  });
+  g.add(backplate,inset,bezel,stem,cap);
+  g.userData.cap=cap;
+  g.userData.capRestZ=cap.position.z;
   return g;
+}
+function animateButtonPress(buttonGroup){
+  const cap=buttonGroup.userData.cap;
+  if(!cap) return;
+  cap.position.z=buttonGroup.userData.capRestZ-0.045;
+  clearTimeout(buttonGroup.userData._pressTimer);
+  buttonGroup.userData._pressTimer=setTimeout(()=>{ cap.position.z=buttonGroup.userData.capRestZ; },130);
 }
 const mainButton=makeButtonMesh(0xc81e2b);
 function placeMainButtonAt(z,side){
@@ -145,28 +226,6 @@ const secondButton=makeButtonMesh(0x2b7ac8); secondButton.visible=false; scene.a
 const dontPressButton=makeButtonMesh(0xd4b106); dontPressButton.visible=false; scene.add(dontPressButton);
 
 // ---- Secret buttons ------------------------------------------------------
-const secretPainting=(function(){
-  const tex=canvasTexture((ctx,w,h)=>{
-    ctx.fillStyle="#3a2a1a"; ctx.fillRect(0,0,w,h);
-    ctx.fillStyle="#171008"; ctx.fillRect(6,6,w-12,h-12);
-    ctx.strokeStyle="#000"; ctx.strokeRect(3,3,w-6,h-6);
-  },64,96);
-  const frame=new THREE.Mesh(new THREE.PlaneGeometry(0.55,0.8),new THREE.MeshStandardMaterial({map:tex}));
-  return frame;
-})();
-scene.add(secretPainting);
-const secretButtonPainting=makeButtonMesh(0xd4b106);
-secretButtonPainting.scale.set(0.6,0.6,0.6);
-scene.add(secretButtonPainting);
-function placeSecretPainting(){
-  const z=-14, side=-1;
-  secretPainting.position.set(side*(CORR_W/2-0.06),1.4,z);
-  secretPainting.rotation.y=Math.PI/2;
-  secretButtonPainting.position.set(side*(CORR_W/2-0.09),1.15,z+0.15);
-  secretButtonPainting.rotation.y=Math.PI/2;
-}
-placeSecretPainting();
-
 const secretButtonFloor=makeButtonMesh(0xc81e2b);
 secretButtonFloor.scale.set(0.5,0.5,0.5);
 secretButtonFloor.rotation.x=-Math.PI/2;
@@ -190,7 +249,7 @@ secretButtonBehind.visible=false;
 scene.add(secretButtonBehind);
 let behindButtonSpawned=false;
 
-// ---- Duck / chicken / prop helpers --------------------------------------
+// ---- Duck / prop helpers --------------------------------------
 function spawnDuck(x,z){
   const g=new THREE.Group();
   const body=new THREE.Mesh(new THREE.SphereGeometry(0.15,8,8),new THREE.MeshStandardMaterial({color:0xd4b106}));
@@ -200,26 +259,32 @@ function spawnDuck(x,z){
   scene.add(g);
   return g;
 }
-function spawnChickens(centerZ){
-  const chickens=[];
-  for(let i=0;i<40;i++){
-    const c=new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6),new THREE.MeshStandardMaterial({color:0xe8e0c8}));
-    c.position.set((Math.random()-0.5)*CORR_W*0.8,0.1,centerZ-Math.random()*20);
-    scene.add(c); chickens.push(c);
-  }
-  SFX.chickenCluck();
-  return chickens;
-}
 
 // ---- Monster --------------------------------------------------------------
 const monster=(function(){
   const g=new THREE.Group();
-  const mat=new THREE.MeshStandardMaterial({color:0x020202,roughness:1});
-  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.42,1.5,0.28),mat); torso.position.y=1.05;
-  const head=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8),mat); head.position.y=1.95;
-  const armL=new THREE.Mesh(new THREE.BoxGeometry(0.1,1.1,0.1),mat); armL.position.set(-0.32,0.9,0);
-  const armR=armL.clone(); armR.position.x=0.32;
-  g.add(torso,head,armL,armR);
+  // Near-black, almost no light response - it should read as a silhouette, not a model.
+  const mat=new THREE.MeshStandardMaterial({color:0x030303,roughness:1,metalness:0});
+  const eyeMat=new THREE.MeshBasicMaterial({color:0xff1a1a});
+
+  // Tall, unnaturally thin and slightly hunched - proportions that don't quite read as human.
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.3,1.75,0.2),mat);
+  torso.position.y=1.2; torso.rotation.x=0.09;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.14,10,10),mat);
+  head.scale.set(0.85,1.15,0.9);
+  head.position.set(0,2.18,0.06);
+  // pinprick glowing eyes - the one detail meant to actually be seen
+  const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.016,6,6),eyeMat); eyeL.position.set(-0.045,2.2,0.16);
+  const eyeR=eyeL.clone(); eyeR.position.x=0.045;
+  // long, disproportionate arms that hang past where knees would be
+  const armL=new THREE.Mesh(new THREE.BoxGeometry(0.065,1.55,0.065),mat);
+  armL.position.set(-0.26,1.05,0.05); armL.rotation.z=0.1; armL.rotation.x=0.06;
+  const armR=armL.clone(); armR.position.x=0.26; armR.rotation.z=-0.1;
+  const legL=new THREE.Mesh(new THREE.BoxGeometry(0.11,0.9,0.11),mat); legL.position.set(-0.1,0.45,0);
+  const legR=legL.clone(); legR.position.x=0.1;
+
+  g.add(torso,head,eyeL,eyeR,armL,armR,legL,legR);
+  g.userData.eyes=[eyeL,eyeR];
   g.visible=false;
   scene.add(g);
   return g;
@@ -230,6 +295,29 @@ function monsterPeek(x,z,duration){
   showMonsterAt(x,z);
   setTimeout(hideMonster,duration||220);
 }
+// Subtle wrongness while it's visible - never fully still, never fully readable.
+function updateMonsterIdle(){
+  if(!monster.visible) return;
+  const t=performance.now()*0.001;
+  monster.rotation.y=Math.sin(t*0.7)*0.05+(Math.random()-0.5)*0.01;
+  monster.position.y=Math.sin(t*3.1)*0.01;
+  const eyeFlicker=Math.random()<0.02?0:1;
+  monster.userData.eyes.forEach(e=>e.visible=eyeFlicker>0||Math.random()>0.05);
+}
+
+// ---- Camera shake & jumpscare flash ---------------------------------
+let shakeUntil=0, shakeMag=0;
+function cameraShake(mag,durationMs){ shakeMag=mag; shakeUntil=performance.now()+durationMs; }
+function jumpscareFlash(){
+  const el=document.getElementById("jumpscare-flash");
+  el.style.transition="none";
+  el.style.opacity="0.85";
+  requestAnimationFrame(()=>{
+    el.style.transition="opacity .4s ease-out";
+    el.style.opacity="0";
+  });
+}
+
 
 // ---- Player state ---------------------------------------------------------
 let yaw=0, pitch=0; // yaw=0 means camera looks down -Z, i.e. forward into the hallway
@@ -240,6 +328,22 @@ let distanceAccum=0;
 let paused=false;
 let gameEnded=false;
 let mouseSensitivity=0.0022;
+
+// ---- Stamina ----------------------------------------------------------
+let stamina=100;
+let canSprint=true;
+const STAMINA_DRAIN=26;    // per second while sprinting
+const STAMINA_REGEN=15;    // per second while not sprinting
+const STAMINA_REENABLE=22; // must regen back above this before sprint re-enables after hitting 0
+const staminaFillEl=document.getElementById("stamina-bar-fill");
+const staminaWrapEl=document.getElementById("stamina-bar-wrap");
+function updateStaminaBar(isSprinting){
+  if(!staminaFillEl) return;
+  staminaFillEl.style.width=stamina+"%";
+  staminaFillEl.classList.toggle("low",stamina<30);
+  staminaFillEl.classList.toggle("depleted",!canSprint);
+  staminaWrapEl.classList.toggle("active",isSprinting||stamina<100);
+}
 
 addEventListener("keydown",e=>{
   keys[e.code]=true;
@@ -314,7 +418,6 @@ function getInteractables(){
     {mesh:mainButton,range:2.0,visible:true,label:"[ SPACE ] PRESS THE BUTTON",onPress:pressMainButton},
     {mesh:secondButton,range:1.8,visible:secondButton.visible,label:"[ SPACE ] PRESS THE OTHER BUTTON",onPress:pressSecondButton},
     {mesh:dontPressButton,range:1.8,visible:dontPressButton.visible,label:"[ SPACE ] ??? (YOU PROBABLY SHOULDN'T)",onPress:pressDontPressButton},
-    {mesh:secretButtonPainting,range:1.6,visible:true,label:"[ SPACE ] PRESS IT",onPress:pressPaintingButton},
     {mesh:secretButtonFloor,range:1.2,visible:true,label:"[ SPACE ] THIS SEEMS UNWISE",onPress:pressFloorButton},
     {mesh:secretButtonDark,range:1.6,visible:!lightsOn,label:"[ SPACE ] PRESS IT",onPress:pressDarkButton},
     {mesh:secretButtonBackward,range:1.6,visible:secretButtonBackward.visible,label:"[ SPACE ] PRESS IT",onPress:pressBackwardButton},
@@ -385,6 +488,7 @@ function pressMainButton(){
   if(counterStuckAt){
     stuckPresses++;
     SFX.glitchBeep();
+    animateButtonPress(mainButton);
     updateCounterDisplay();
     if(stuckPresses===3) showCaption("STOP.",{warn:true,duration:1600});
     if(stuckPresses>=4){ counterStuckAt=0; stuckPresses=0; updateCounterDisplay(); }
@@ -392,6 +496,7 @@ function pressMainButton(){
   }
   pressCount++;
   SFX.buttonClick();
+  animateButtonPress(mainButton);
   updateCounterDisplay();
   const newLevel=computeLevel();
   if(newLevel!==level){ level=newLevel; onLevelChange(level); }
@@ -406,6 +511,7 @@ function pressMainButton(){
 
 function pressSecondButton(){
   SFX.buttonClick();
+  animateButtonPress(secondButton);
   const pool=[
     ()=>showCaption("That did something. Probably."),
     ()=>{ spawnDuck(camera.position.x,camera.position.z-3); showCaption("Another duck."); },
@@ -415,21 +521,20 @@ function pressSecondButton(){
 }
 function pressDontPressButton(){
   SFX.stinger();
+  animateButtonPress(dontPressButton);
+  jumpscareFlash();
+  cameraShake(0.06,500);
   showMonsterAt(camera.position.x, camera.position.z-1.6);
   setTimeout(hideMonster,260);
   bumpProximity(0.35);
   showCaption("YOU WERE WARNED.",{warn:true,duration:2600});
 }
 
-function pressPaintingButton(){
-  SFX.buttonClick();
-  spawnChickens(secretButtonPainting.position.z);
-  hideMonster();
-  showCaption("ONE HUNDRED CHICKENS APPEAR.",{duration:2000});
-  setTimeout(()=>endGame("stupid"),2200);
-}
 function pressFloorButton(){
   SFX.stinger();
+  animateButtonPress(secretButtonFloor);
+  jumpscareFlash();
+  cameraShake(0.08,700);
   showMonsterAt(camera.position.x+0.3, camera.position.z-1.1);
   bumpProximity(0.5);
   showCaption("YOU PROBABLY SHOULDN'T HAVE DONE THAT.",{warn:true,duration:2400});
@@ -441,6 +546,7 @@ function pressFloorButton(){
 }
 function pressDarkButton(){
   SFX.buttonClick();
+  animateButtonPress(secretButtonDark);
   setLights(true);
   flashlight.intensity=2.2;
   clearTimeout(flashlight._timer);
@@ -449,11 +555,15 @@ function pressDarkButton(){
 }
 function pressBackwardButton(){
   SFX.buttonClick();
+  animateButtonPress(secretButtonBackward);
   reverseUntil=performance.now()+9000;
   showCaption("The controls feel wrong now.",{warn:true});
 }
 function pressBehindButton(){
   SFX.stinger();
+  animateButtonPress(secretButtonBehind);
+  jumpscareFlash();
+  cameraShake(0.1,800);
   triggerSecretEnding();
 }
 
@@ -498,7 +608,7 @@ const YELLOW=[
   ()=>{ makeWallsBreathe(); },
 ];
 const RED=[
-  ()=>{ showMonsterAt(camera.position.x,camera.position.z-6); setTimeout(hideMonster,900); SFX.stinger(); bumpProximity(0.18); showCaption("Something is here with you.",{warn:true}); },
+  ()=>{ showMonsterAt(camera.position.x,camera.position.z-6); jumpscareFlash(); cameraShake(0.05,400); setTimeout(hideMonster,900); SFX.stinger(); bumpProximity(0.18); showCaption("Something is here with you.",{warn:true}); },
   ()=>{ setLights(false); showCaption("The lights go out.",{warn:true}); },
   ()=>{ showCaption("You hear the doors lock.",{warn:true}); bumpProximity(0.05); },
   ()=>{ extendHallway(6); placeFinalDoor(); showCaption("The hallway just got longer.",{warn:true}); },
@@ -511,7 +621,7 @@ const PURPLE=[
   ()=>{ SFX.stopDrone(); showCaption("Elevator music plays for a moment."); setTimeout(()=>SFX.startDrone(),4000); },
   ()=>{ showCaption("The hallway briefly looks like a supermarket."); },
   ()=>{ showCaption("You now have a banana."); },
-  ()=>{ SFX.chickenCluck(); showCaption("Your character's voice changed."); },
+  ()=>{ SFX.voiceBlip(); showCaption("Your character's voice changed."); },
   ()=>{ showCaption('"bruh"'); },
   ()=>{ showCaption("The button did absolutely nothing."); },
 ];
@@ -593,6 +703,8 @@ function startChase(){
   chaseActive=true; chaseStart=performance.now();
   setLights(false);
   SFX.thud();
+  jumpscareFlash();
+  cameraShake(0.12,900);
   showCaption("BOOM.",{warn:true,duration:1400});
   setTimeout(()=>{
     showMonsterAt(camera.position.x, camera.position.z-8);
@@ -665,7 +777,12 @@ function animate(){
   if(paused||gameEnded){ renderer.render(scene,camera); return; }
 
   camera.rotation.order="YXZ";
-  camera.rotation.y=yaw; camera.rotation.x=pitch;
+  let shakeYaw=0, shakePitch=0;
+  if(performance.now()<shakeUntil){
+    shakeYaw=(Math.random()-0.5)*shakeMag;
+    shakePitch=(Math.random()-0.5)*shakeMag;
+  }
+  camera.rotation.y=yaw+shakeYaw; camera.rotation.x=pitch+shakePitch;
 
   // movement
   const forward=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0,yaw,0));
@@ -675,17 +792,30 @@ function animate(){
   if(keys["KeyS"]||keys["ArrowDown"]) moveZ-=1;
   if(keys["KeyD"]) moveX+=1;
   if(keys["KeyA"]) moveX-=1;
+  const isMovingInput=moveZ!==0||moveX!==0;
   const reversed=performance.now()<reverseUntil;
   if(reversed){ moveZ*=-1; moveX*=-1; }
+
+  const wantsSprint=running && canSprint && isMovingInput;
+  if(wantsSprint){
+    stamina=Math.max(0,stamina-STAMINA_DRAIN*delta);
+    if(stamina<=0) canSprint=false;
+  }else{
+    stamina=Math.min(100,stamina+STAMINA_REGEN*delta);
+    if(!canSprint && stamina>=STAMINA_REENABLE) canSprint=true;
+  }
+  updateStaminaBar(wantsSprint);
+
   const speedBoost=performance.now()<runSpeedUntil?1.4:1;
-  const speed=(running?3.4:1.9)*speedBoost;
+  const speed=(wantsSprint?3.4:1.9)*speedBoost;
   const move=new THREE.Vector3();
   move.addScaledVector(forward,moveZ).addScaledVector(right,moveX);
   if(move.lengthSq()>0){
     move.normalize().multiplyScalar(speed*delta);
     camera.position.add(move);
     distanceAccum+=move.length();
-    if(distanceAccum>2.1 && !chaseActive){ distanceAccum=0; SFX.footstep(); }
+    const footstepGap=wantsSprint?1.5:2.1;
+    if(distanceAccum>footstepGap && !chaseActive){ distanceAccum=0; SFX.footstep(); }
   }
   camera.position.x=Math.max(-1.3,Math.min(1.3,camera.position.x));
   const minZ=hallwayEndZ+0.6, maxZ=STARTZ+1.3;
@@ -707,6 +837,7 @@ function animate(){
   updateLookBehind();
   updateChase(delta);
   updateAmbience(delta);
+  updateMonsterIdle();
 
   // reached the end door -> good ending (once level 5 reached, i.e. story complete)
   if(!chaseActive && level>=4 && camera.position.z<hallwayEndZ+2.4){
@@ -720,4 +851,6 @@ function animate(){
 }
 setLights(false);
 updateCounterDisplay();
+updateStaminaBar(false);
 animate();
+
