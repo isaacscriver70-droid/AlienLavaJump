@@ -79,15 +79,52 @@ const SFX=(function(){
     setTimeout(()=>{ if(!muted) noiseBurst(.025,4200,.2); },40);
   }
   function footstep(){ noiseBurst(.05+Math.random()*.03,170+Math.random()*90,.15+Math.random()*.07); }
-  function doorOpen(){ tone(60,.9,"sawtooth",.15,40); }
+  function monsterFootstep(){ noiseBurst(.09+Math.random()*.04,90+Math.random()*40,.22+Math.random()*.05); }
+  function doorOpen(){
+    if(muted) return;
+    const c=ensureCtx();
+    // creaky hinge - slow pitch-bending filtered noise, plus a low wood groan
+    const src=c.createBufferSource();
+    src.buffer=noiseBuffer(0.9);
+    const filt=c.createBiquadFilter(); filt.type="bandpass";
+    filt.frequency.setValueAtTime(300,c.currentTime);
+    filt.frequency.exponentialRampToValueAtTime(900,c.currentTime+0.6);
+    filt.frequency.exponentialRampToValueAtTime(500,c.currentTime+0.9);
+    filt.Q.value=6;
+    const g=c.createGain();
+    g.gain.setValueAtTime(.001,c.currentTime);
+    g.gain.linearRampToValueAtTime(.22,c.currentTime+.15);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.9);
+    src.connect(filt); filt.connect(g); g.connect(master());
+    src.start();
+    tone(50,1,"sawtooth",.12,38);
+  }
+  function doorClose(){ noiseBurst(.12,300,.3); tone(45,.2,"sine",.15,30); }
   function lightBuzzOn(){ tone(220,.4,"square",.05); }
   function stinger(){
     noiseBurst(.5,1200,.5);
     tone(55,.7,"sawtooth",.4,30);
     tone(900,.15,"square",.2);
   }
+  function monsterGrowl(){
+    if(muted) return;
+    const c=ensureCtx();
+    const src=c.createBufferSource();
+    src.buffer=noiseBuffer(1.1);
+    const filt=c.createBiquadFilter(); filt.type="lowpass";
+    filt.frequency.setValueAtTime(220,c.currentTime);
+    filt.frequency.exponentialRampToValueAtTime(80,c.currentTime+1.0);
+    const g=c.createGain();
+    g.gain.setValueAtTime(.001,c.currentTime);
+    g.gain.linearRampToValueAtTime(.35,c.currentTime+.2);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+1.1);
+    src.connect(filt); filt.connect(g); g.connect(master());
+    src.start();
+    tone(38,1.1,"sawtooth",.22,26);
+  }
   function thud(){ noiseBurst(.3,120,.4); }
   function whisper(){ noiseBurst(1.2,2400,.06); }
+  function flashlightClick(){ noiseBurst(.02,3500,.18); tone(2200,.02,"square",.08); }
   function voiceBlip(){
     tone(600,.08,"square",.2,900);
     setTimeout(()=>tone(500,.08,"square",.2,850),90);
@@ -146,8 +183,8 @@ const SFX=(function(){
   }
 
   return {
-    ensureCtx, buttonClick, footstep, doorOpen, lightBuzzOn, stinger, thud,
-    whisper, voiceBlip, staticBurst, glitchBeep,
+    ensureCtx, buttonClick, footstep, monsterFootstep, doorOpen, doorClose, lightBuzzOn, stinger, thud,
+    whisper, voiceBlip, staticBurst, glitchBeep, flashlightClick, monsterGrowl,
     startDrone, stopDrone, setDroneIntensity,
     startBreathing, stopBreathing, setBreathingVolume,
     setMuted
